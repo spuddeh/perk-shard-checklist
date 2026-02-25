@@ -10,3 +10,7 @@ custom_refs.txt
 .history/
 *.log
 custom_tweaks.txt
+
+*.zip
+*.xcf
+images/
