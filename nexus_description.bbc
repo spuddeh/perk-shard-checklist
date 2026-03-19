@@ -1,67 +1,67 @@
 [center][size=6][color=#ffff00][b]Perk Shard Checklist[/b][/color][/size]
-<br />[size=4]An in-game UI checklist to track all 13 Perk Shards.[/size][/center]
-<br />
-<br />I originally made this mod for my own personal use. After multiple playthroughs, I got sick of trying to remember which Perk Shards I had already collected and constantly having to look up locations in guides.
-<br />
-<br />This mod adds a simple, in-game UI to track all 13 Perk Shards so you never have to alt-tab again. I thought I'd share it in case anyone else finds it useful.
-<br />
-<br />[center][img]https://i.imgur.com/mltbqc8.gif[/img][/center]
-<br />[line]
-<br />[size=5][color=#ffff00][b]New in 2.0.0: The Automation Update[/b][/color][/size]
-<br />[list]
-<br />[*][b]Proximity Scanner:[/b] Passively detects uncollected Perk Shards nearby (50m range) and marks them on your HUD.
-<br />[*][b]Smart Pause:[/b] The scanner automatically pauses during Loading Screens, Fast Travel, and Menus to save performance. It includes a smart "Fade-In" grace period.
-<br />[*][b]Zero-Overhead:[/b] Heavily optimised to ensure it has a negligible impact on your FPS.
-<br />[/list]
-<br />[line]
-<br />[size=5][color=#ffff00][b]Features[/b][/color][/size]
-<br />[list]
-<br />[*][b]Automatic Tracking[/b]: Passively detects Perk Shards as you play and checks them off once collected.
-<br />[*][b]In-Game Checklist[/b]: Manually track or view your progress on all 13 Perk Shards (from the base game and Phantom Liberty).
-<br />[*]Progress is saved automatically with your game save (per-character).
-<br />[*]A [b]Settings[/b] tab to configure the new Proximity Scanner (Radius, Interval) and optional [b]Lazy Mode[/b].
-<br />[*]In-game descriptions, closest fast travel points, and location info for every shard.
-<br />[*]A [b]Set Map Pin[/b] button to create a waypoint to the shard's location.
-<br />[*]A [b]Teleport[/b] button (in Lazy Mode) to instantly teleport to the shard.
-<br />[*]An [b]Unstuck[/b] button (in Lazy Mode) to teleport you to V's H10 apartment if you get stuck.
-<br />[*]A counter to see your total collected shards.
-<br />[/list]
-<br />[line]
-<br />[size=5][color=#ffff00][b]How to Use[/b][/color][/size]
-<br />[list=1]
-<br />[*]Open the Cyber Engine Tweaks overlay.
-<br />[*]The "Perk Shard Checklist" window will appear.
-<br />[*]Click the checkboxes to mark your progress manually, or let the [b]Proximity Scanner[/b] handle that for you.
-<br />[*][b]Proximity Scanning[/b]: Enable (default) this in the [b]Settings[/b] tab to see nearby items on your HUD as you play.
-<br />[list][*]You can also adjust how frequently the scan occurs (default 3.0s), as well as the range (default 50m).
-<br />[/list][/list][*]To save your progress, [b]Quicksave (F5)[/b] or [b]Manual Save[/b] your game. The progress is tied to that save file.
-<br />
-<br />[line]
-<br />[size=5][color=#ffff00][b]Lazy Mode[/b][/color][/size]
-<br />For those who just want to get it done, you can enable "Lazy Mode" in the Settings tab. This will show the "Teleport" and "Unstuck" buttons.
-<br />
-<br />[color=#e06666][b]WARNING:[/b][/color] Using teleport functions can be risky. It may cause issues with your save or get you stuck. Use at your own risk and always have a recent manual save!
-<br />
-<br />[line]
-<br />[size=5][color=#ffff00][b]Installation[/b][/color][/size]
-<br />[list=1]
-<br />[*]Install with a mod manager (recommended).
-<br />[*]Install [url=https://www.nexusmods.com/cyberpunk2077/mods/107]Cyber Engine Tweaks[/url].
-<br />[*]For manual install, download and extract the main file into your Cyberpunk 2077 game directory.
-<br />[/list]
-<br />[line]
-<br />[size=5][color=#ffff00][b]Known Issues[/b][/color][/size]
-<br />[list]
-<br />[*]When you use the "Set Map Pin" button, the breadcrumbs (navigation path) may not appear immediately. You will need to [b]open and close your in-game Map (M)[/b] for the path to appear.
-<br />[*][b]Retroactive Tracking[/b]: The mod detects quest-related Perk Shards using "Quest Facts" even if you picked them up before installing. However, generic open-world shards do not have these flags. You may need to revisit their locations with the [b]Proximity Scanner[/b] enabled to verify them.
-<br />[/list]
-<br />[line]
-<br />[size=5][color=#ffff00][b]Inspiration &amp; Credits[/b][/color][/size]
-<br />This mod was heavily inspired by [b][url=https://www.nexusmods.com/cyberpunk2077/mods/17452]Iconic Weapons Checklist[/url][/b] by [b]yakuzadeso[/b].
-<br />
-<br />This mod would not be possible without:
-<br />[list]
-<br />[*][b]yamashi[/b] and the CET team for creating [url=https://www.nexusmods.com/cyberpunk2077/mods/107]Cyber Engine Tweaks[/url].
-<br />[*][b]psiberx[/b] for their amazing [url=https://github.com/psiberx/cp2077-cet-kit]CET Kit[/url] and especially the 'GameSession.lua' module, which handles all the per-save-file saving.
-<br />[*]The Cyberpunk 2077 Modding community for all the public documentation and guides.
-<br />[/list]
+[size=4]An in-game UI checklist to track all 13 Perk Shards.[/size][/center]
+
+I originally made this mod for my own personal use. After multiple playthroughs, I got sick of trying to remember which Perk Shards I had already collected and constantly having to look up locations in guides.
+
+This mod adds a simple, in-game UI to track all 13 Perk Shards so you never have to alt-tab again. I thought I'd share it in case anyone else finds it useful.
+
+[center][img]https://i.imgur.com/mltbqc8.gif[/img][/center]
+[line]
+[size=5][color=#ffff00][b]New in 2.0.0: The Automation Update[/b][/color][/size]
+[list]
+[*][b]Proximity Scanner:[/b] Passively detects uncollected Perk Shards nearby (50m range) and marks them on your HUD.
+[*][b]Smart Pause:[/b] The scanner automatically pauses during Loading Screens, Fast Travel, and Menus to save performance. It includes a smart "Fade-In" grace period.
+[*][b]Zero-Overhead:[/b] Heavily optimised to ensure it has a negligible impact on your FPS.
+[/list]
+[line]
+[size=5][color=#ffff00][b]Features[/b][/color][/size]
+[list]
+[*][b]Automatic Tracking[/b]: Passively detects Perk Shards as you play and checks them off once collected.
+[*][b]In-Game Checklist[/b]: Manually track or view your progress on all 13 Perk Shards (from the base game and Phantom Liberty).
+[*]Progress is saved automatically with your game save (per-character).
+[*]A [b]Settings[/b] tab to configure the new Proximity Scanner (Radius, Interval) and optional [b]Lazy Mode[/b].
+[*]In-game descriptions, closest fast travel points, and location info for every shard.
+[*]A [b]Set Map Pin[/b] button to create a waypoint to the shard's location.
+[*]A [b]Teleport[/b] button (in Lazy Mode) to instantly teleport to the shard.
+[*]An [b]Unstuck[/b] button (in Lazy Mode) to teleport you to V's H10 apartment if you get stuck.
+[*]A counter to see your total collected shards.
+[/list]
+[line]
+[size=5][color=#ffff00][b]How to Use[/b][/color][/size]
+[list=1]
+[*]Open the Cyber Engine Tweaks overlay.
+[*]The "Perk Shard Checklist" window will appear.
+[*]Click the checkboxes to mark your progress manually, or let the [b]Proximity Scanner[/b] handle that for you.
+[*][b]Proximity Scanning[/b]: Enable (default) this in the [b]Settings[/b] tab to see nearby items on your HUD as you play.
+[list][*]You can also adjust how frequently the scan occurs (default 3.0s), as well as the range (default 50m).
+[/list][/list][*]To save your progress, [b]Quicksave (F5)[/b] or [b]Manual Save[/b] your game. The progress is tied to that save file.
+
+[line]
+[size=5][color=#ffff00][b]Lazy Mode[/b][/color][/size]
+For those who just want to get it done, you can enable "Lazy Mode" in the Settings tab. This will show the "Teleport" and "Unstuck" buttons.
+
+[color=#e06666][b]WARNING:[/b][/color] Using teleport functions can be risky. It may cause issues with your save or get you stuck. Use at your own risk and always have a recent manual save!
+
+[line]
+[size=5][color=#ffff00][b]Installation[/b][/color][/size]
+[list=1]
+[*]Install with a mod manager (recommended).
+[*]Install [url=https://www.nexusmods.com/cyberpunk2077/mods/107]Cyber Engine Tweaks[/url].
+[*]For manual install, download and extract the main file into your Cyberpunk 2077 game directory.
+[/list]
+[line]
+[size=5][color=#ffff00][b]Known Issues[/b][/color][/size]
+[list]
+[*]When you use the "Set Map Pin" button, the breadcrumbs (navigation path) may not appear immediately. You will need to [b]open and close your in-game Map (M)[/b] for the path to appear.
+[*][b]Retroactive Tracking[/b]: The mod detects quest-related Perk Shards using "Quest Facts" even if you picked them up before installing. However, generic open-world shards do not have these flags. You may need to revisit their locations with the [b]Proximity Scanner[/b] enabled to verify them.
+[/list]
+[line]
+[size=5][color=#ffff00][b]Inspiration & Credits[/b][/color][/size]
+This mod was heavily inspired by [b][url=https://www.nexusmods.com/cyberpunk2077/mods/17452]Iconic Weapons Checklist[/url][/b] by [b]yakuzadeso[/b].
+
+This mod would not be possible without:
+[list]
+[*][b]yamashi[/b] and the CET team for creating [url=https://www.nexusmods.com/cyberpunk2077/mods/107]Cyber Engine Tweaks[/url].
+[*][b]psiberx[/b] for their amazing [url=https://github.com/psiberx/cp2077-cet-kit]CET Kit[/url] and especially the 'GameSession.lua' module, which handles all the per-save-file saving.
+[*]The Cyberpunk 2077 Modding community for all the public documentation and guides.
+[/list]
