@@ -2,7 +2,7 @@
 -- Mod Name: Perk Shard Checklist
 -- Author: Spuddeh
 -- Description: Main entry point and initialization logic.
--- Mod Version: 2.0.2
+-- Mod Version: 2.1.0
 -- ======================================================================================
 
 local PerkShardsDB = require("db")
@@ -11,12 +11,7 @@ local ChecklistUI = require("Modules/ChecklistUI")
 local SettingsUI = require("Modules/SettingsUI")
 local Automation = require("Modules/Automation")
 local Inspector = require("Modules/Inspector")
-local Cron = require("Modules/Cron")
 local Utils = require("Modules/Utils")
-
--- ### TOGGLES ###
-
--- local DEV_MODE = false -- Set to false for Nexus release -> Removed for persistence
 
 -- ### MOD STATE ###
 
@@ -63,22 +58,16 @@ local function LoadConfig()
   end
   -- Enforce defaults for new settings if missing
   if settings.automation_enabled == nil then settings.automation_enabled = true end
-  if not settings.scanner_interval then settings.scanner_interval = 5.0 end
   if not settings.scanner_radius then settings.scanner_radius = 50.0 end
-
-  -- Sync dev mode toggle to runtime settings -> Removed, handled by JSON load
-  -- settings.dev_mode_enabled = DEV_MODE
 end
 
 -- ### CALLBACKS ###
 
 local uiCallbacks = {
   onToggle = function(id, value)
-    -- Use Automation to handle state changes (triggers stop logic/debug logs)
     if Automation.SetItemStatus then
       Automation.SetItemStatus(id, value)
     else
-      -- Fallback if Automation not ready (shouldn't happen)
       sessionState.progress[id] = value
     end
   end,
@@ -113,10 +102,8 @@ local uiCallbacks = {
     end
 
     if action == "teleport" then
-      Automation.OnTeleport()
       TeleportTo(entry.coords, entry.name)
     elseif action == "gig_teleport" then
-      Automation.OnTeleport()
       TeleportTo(entry.gig_coords, entry.name .. " (Gig Start)")
     elseif action == "mappin" then
       SetPin(entry.coords, entry.name)
@@ -125,9 +112,7 @@ local uiCallbacks = {
     end
   end,
 
-  -- Settings Callbacks being delegated to SettingsUI
   drawSettings = function()
-    -- Define sub-callbacks for the SettingsUI module
     local settingsCallbacks = {
       onSettingChanged = function()
         Automation.UpdateState()
@@ -140,7 +125,6 @@ local uiCallbacks = {
           ImGui.TextDisabled("Dev Tools")
 
           if ImGui.Button("INSPECT TARGET (LOG FACTS/ID)") then
-            -- Directly call Inspector
             Inspector.DumpFacts()
           end
           if ImGui.IsItemHovered() then
@@ -149,7 +133,6 @@ local uiCallbacks = {
           end
 
           ImGui.Spacing()
-          -- Fact Listener Toggle
           if settings.log_facts == nil then settings.log_facts = false end
           local new_log_facts = ImGui.Checkbox("Log Fact Changes (Spammy!)", settings.log_facts)
           if new_log_facts ~= settings.log_facts then
@@ -179,29 +162,47 @@ local uiCallbacks = {
 -- ### EVENTS ###
 
 registerForEvent("onInit", function()
+  local Engine = GetMod("0-Engine")
+  if not Engine then
+    spdlog.error("[PSC] FATAL: 0-Engine not found. Install from Nexus (ID 27967).")
+    return
+  end
+  local Mod = Engine.Register("perk_shard_checklist")
+
   LoadConfig()
 
   if settings.dev_mode_enabled then
     Utils.Log("DEV MODE ACTIVE - Inspector Enabled")
     Inspector.Init()
-    -- Sync Fact Listener state from saved settings
     if settings.log_facts then
       Inspector.ToggleFactListener(true)
     end
   end
 
+  -- 0-Engine: combat and cutscene suppression
+  Engine.Subscribe("CombatStateChanged", function(inCombat)
+    Automation.SetInCombat(inCombat)
+  end)
+  Engine.Subscribe("SceneTierChanged", function(tier)
+    Automation.SetInCutscene(tier > 1)
+  end)
 
+  -- 0-Engine: menu pause/resume (replaces GameSession.IsPaused polling)
+  Engine.Subscribe("MenuOpen", function()
+    Automation.SetMenuPaused(true)
+  end)
+  Engine.Subscribe("MenuClose", function()
+    Automation.SetMenuPaused(false)
+  end)
 
   -- VENDOR LISTENER: Precise ID from UI Data
   ObserveAfter("FullscreenVendorGameController", "OnSetUserData", function(this)
     if not isSessionActive then return end
 
-    -- The 'userData' is stored in the controller after SetUserData runs
     local userData = this.vendorUserData
     if userData and userData.vendorData and userData.vendorData.data then
       local vendorID = userData.vendorData.data.entityID
 
-      -- Notify Automation that Vendor UI is open (queues messages)
       Automation.SetVendorOpen(true)
 
       local vendorEnt = Game.FindEntityByID(vendorID)
@@ -212,8 +213,6 @@ registerForEvent("onInit", function()
           Utils.Log("Vendor Record ID: " .. tostring(recordID))
         end
 
-        -- Pass the Entity object or ID? logic usually takes ID, but we might need to handle record checks now.
-        -- For now, we still pass ID, but we need to update Automation to check Records.
         Automation.ScanTarget(vendorID)
       end
     end
@@ -229,7 +228,6 @@ registerForEvent("onInit", function()
   -- VENDOR PURCHASE LISTENER: Re-scan immediately on buy
   ObserveAfter("FullscreenVendorGameController", "OnUIVendorItemBoughtEvent", function(this, evt)
     if not isSessionActive then return end
-    -- evt is UIVendorItemsBoughtEvent
     local userData = this.vendorUserData
     if userData and userData.vendorData and userData.vendorData.data then
       local vendorID = userData.vendorData.data.entityID
@@ -238,90 +236,73 @@ registerForEvent("onInit", function()
     end
   end)
 
-  -- LOOT TRACKING STATE
-  -- Controlled by Automation scanner (LookAt) -> Removed as we use PlayerPuppet hook now
-
   -- PLAYER INVENTORY LISTENER: Detect Looting
-  -- Switched to UIInventoryScriptableSystem for reliability (like CSC)
+  -- Early-exit: skip entirely if not near any uncollected shard (SpatialSet proximity guard)
   Observe("UIInventoryScriptableSystem", "OnInventoryItemAdded", function(_, request)
     if not isSessionActive then return end
+    if not Automation.HasNearbyEntries() then return end
 
-    local itemID = request.itemID
-    local tdbid = ItemID.GetTDBID(itemID)
-
+    local tdbid = ItemID.GetTDBID(request.itemID)
     if not tdbid then return end
 
     local idString = tostring(tdbid)
 
     if string.find(idString, "Skillbook") or string.find(idString, "PerkPoint") then
-      -- Log generic receipt (cannot identify specific container from ItemID alone)
       if settings.dev_mode_enabled then
         Utils.Log("[Loot] Perk Shard added to inventory. Triggering proximity resolution...", Utils.LogLevel.Debug)
       end
 
-      -- PREDICTIVE RESOLUTION: Check for closest uncollected container (100m radius)
       local resolvedEntry = Automation.ResolveClosestUncollected(100.0)
 
       if resolvedEntry then
-        -- Match Found! Mark collected immediately
-        sessionState.progress[resolvedEntry.id] = true
+        Automation.SetItemStatus(resolvedEntry.id, true)
         Utils.Notify("Perk Shard Looted: " .. resolvedEntry.name)
 
         if settings.dev_mode_enabled then
           Utils.Log("[Loot] MATCH FOUND: " .. resolvedEntry.name, Utils.LogLevel.Debug)
         end
-
-        -- Cleanup Mappin if exists
-        Automation.RemoveMappin(resolvedEntry.id)
       else
-        -- No match in range. Fallback to full scan.
         if settings.dev_mode_enabled then
-          Utils.Log("[Loot] No container found within 100m. Falling back to full scan.", Utils.LogLevel.Debug)
+          Utils.Log("[Loot] No container found within 100m.", Utils.LogLevel.Debug)
         end
-        Automation.ProximityScan()
       end
     end
   end)
 
-  -- GameSession Setup (CET Kit Style)
+  -- GameSession: per-character save persistence (unchanged)
   GameSession.StoreInDir('sessions')
   GameSession.Persist(sessionState)
-
-  -- GameSession Triggers
-  GameSession.OnStart(function()
-    Utils.Log("Game Session Started. Initializing Automation.")
-    isSessionActive = true
-
-    -- Initialize Automation (Inject Dependencies)
-    Automation.Init(sessionState, uiCallbacks, settings.dev_mode_enabled, settings)
-
-    -- Initial Scan & Start Loop
-    Automation.UpdateState()
-  end)
-
-  GameSession.OnEnd(function()
-    Utils.Log("Game Session Ended. Cleanup.")
-    isSessionActive = false
-    activeContainerID = nil
-
-    Automation.StopScanner()
-  end)
 
   GameSession.OnSave(function()
     SaveConfig()
   end)
 
-  Utils.Log("Loaded (Wait for Session Start).")
-end)
+  -- 0-Engine: session lifecycle
+  Mod.WhenReady(function(player)
+    Utils.Log("Player Ready. Initializing Automation.")
+    isSessionActive = true
 
-registerForEvent("onUpdate", function(deltaTime)
-  Cron.Update(deltaTime)
+    Automation.Init(sessionState, uiCallbacks, settings.dev_mode_enabled, settings)
+    Automation.SetMenuPaused(false)  -- begin 3s grace period (also schedules deferred Scan)
+    Automation.UpdateState()        -- register SpatialSet
+    Automation.Scan()               -- CheckQuestFacts + immediate proximity check
+  end, nil, 2)
+
+  -- v0.18.0+: PlayerInvalidated no longer fires on vendor opens or transient hiccups.
+  -- Safe to use for full session teardown again.
+  Engine.Subscribe("PlayerInvalidated", function()
+    Utils.Log("Player Invalidated. Stopping mod.")
+    isSessionActive = false
+    Automation.UnregisterItemSet()
+  end)
+
+  Utils.Log("Loaded (Wait for Player Ready).")
 end)
 
 registerForEvent("onOverlayOpen", function()
   isOverlayOpen = true
   if isSessionActive then
-    Automation.Scan() -- Force scan when user checks the list
+    Automation.Scan()
   end
 end)
 
@@ -332,7 +313,6 @@ end)
 registerForEvent("onDraw", function()
   if isOverlayOpen then
     if isSessionActive then
-      -- Pass all context explicitly to Draw (Stateless Pattern)
       ChecklistUI.Draw("Perk Shard Checklist", true, PerkShardsDB, sessionState.progress, settings, uiCallbacks, "manual")
     else
       ChecklistUI.DrawSplashScreen("Perk Shard Checklist")
@@ -342,19 +322,14 @@ end)
 
 -- ### CONSOLE COMMANDS ###
 
---- Toggles Debug Mode via Console
--- Usage: GetMod("perk_shard_checklist").ToggleDebug()
 local function ToggleDebug()
   settings.dev_mode_enabled = not settings.dev_mode_enabled
-  -- DEV_MODE = settings.dev_mode_enabled -- Sync local -> Removed
 
-  -- RE-INIT Automation to update debug state
   Automation.Init(sessionState, uiCallbacks, settings.dev_mode_enabled, settings)
 
   if settings.dev_mode_enabled then
     Utils.Log("Debug Mode ENABLED via Console.")
-    Inspector.Init() -- Ensure inspector is ready
-    -- Sync facts listener if setting is on
+    Inspector.Init()
     if settings.log_facts then
       Inspector.ToggleFactListener(true)
     end
