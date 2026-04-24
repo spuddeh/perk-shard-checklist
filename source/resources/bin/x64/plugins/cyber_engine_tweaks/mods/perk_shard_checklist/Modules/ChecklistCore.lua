@@ -26,8 +26,10 @@ local _entryMap       = {}   -- id → spatial entry table (for lazy removal)
 local _nearbyEntries  = {}   -- id → dbEntry for items currently within scanner_radius
 
 -- Detection zones (pre-registered per uncollected item with container_id)
--- Handles entity snap + inventory check. Persist until item collected.
-local _snapZones     = {}   -- id → zone handle
+-- Two zones per entry: large for mappin snap, small for LookAt-gated inventory check.
+-- Persist until item collected.
+local _snapZones     = {}   -- id → zone handle (wide radius: entity resolve + mappin snap)
+local _lookAtZones   = {}   -- id → zone handle (tight radius: LookAt gate + checkInventory)
 local _mappinSnapped = {}   -- id → bool (whether mappin has been snapped to entity pos)
 
 -- Suppression
@@ -196,23 +198,27 @@ function ChecklistCore.RemoveMappin(entryID)
 end
 
 -- ### DETECTION ZONES ###
--- Pre-registered per uncollected item with a container_id. Each zone:
---   onTick: resolves entity → snaps mappin → calls checkInventory if provided
---   onExit: resets snap state (re-snaps on re-entry)
+-- Two zones per uncollected item with a container_id:
+--   Snap zone (wide): resolves entity and snaps the mappin to world pos.
+--   LookAt zone (tight): runs checkInventory only when the player's crosshair
+--       is on the container entity — guarantees inventory is fully streamed.
 -- Zones persist until the item is collected; no dependency on SpatialSet timing.
 
 local function RegisterDetectionZone(entry)
     if not _engine or not entry.container_id then return end
 
-    local radius  = (_config and _config.snapRadius) or 20.0
-    local setName = (_config and _config.setName) or "checklist"
-    local zoneHandle
-    zoneHandle = _engine.RegisterZone({
-        id       = setName .. "_" .. entry.id,
+    local snapRadius   = (_config and _config.snapRadius) or 20.0
+    local lookAtRadius = (_config and _config.lookAtRadius) or 3.0
+    local setName      = (_config and _config.setName) or "checklist"
+
+    -- Snap zone: mappin creation + entity-position snap
+    local snapHandle
+    snapHandle = _engine.RegisterZone({
+        id       = setName .. "_snap_" .. entry.id,
         x        = entry.coords.x,
         y        = entry.coords.y,
         z        = entry.coords.z,
-        radius   = radius,
+        radius   = snapRadius,
         throttle = 30,
         onTick   = function()
             if _config and _config.canShow and not _config.canShow(entry) then return end
@@ -223,44 +229,15 @@ local function RegisterDetectionZone(entry)
             end
 
             local entity = ResolveEntity(entry)
+            if not entity then return end
 
-            if _isDebug then
-                Utils.Log(string.format("[Zone.onTick] %s | entity=%s | suppressed=%s | clock=%.2f",
-                    entry.id, tostring(entity ~= nil), tostring(ChecklistCore.IsSuppressed()),
-                    os.clock()), Utils.LogLevel.Debug)
-            end
-
-            if not entity then return end  -- entity not loaded yet; retry next tick
-
-            -- Snap mappin to entity world position once loaded (safe during grace period)
+            -- Snap mappin to entity world position once loaded
             if not _mappinSnapped[entry.id] then
                 ChecklistCore.RemoveMappin(entry.id)
                 ChecklistCore.CreateMappin(entry, entity)
                 _mappinSnapped[entry.id] = true
                 if _isDebug then
-                    Utils.Log("[Zone] Mappin snapped to entity: " .. entry.id, Utils.LogLevel.Debug)
-                end
-            end
-
-            -- Inventory check respects grace period: loot generation may not be complete
-            -- immediately after loading, which would cause a false empty-container read.
-            if ChecklistCore.IsSuppressed() then return end
-
-            -- result == false : container confirmed empty → auto-collect
-            -- result == true  : item present, keep monitoring
-            -- result == nil   : inventory not ready, retry next tick
-            if _config and _config.checkInventory then
-                local trans = Game.GetTransactionSystem()
-                if trans then
-                    local result = _config.checkInventory(entry, entity, trans)
-                    if _isDebug then
-                        Utils.Log(string.format("[Zone.checkInventory] %s | result=%s | clock=%.2f",
-                            entry.id, tostring(result), os.clock()), Utils.LogLevel.Debug)
-                    end
-                    if result == false then
-                        Utils.Log("[Zone] Container empty. Auto-collecting: " .. entry.name)
-                        ChecklistCore.SetItemStatus(entry.id, true)
-                    end
+                    Utils.Log("[SnapZone] Mappin snapped to entity: " .. entry.id, Utils.LogLevel.Debug)
                 end
             end
         end,
@@ -269,23 +246,121 @@ local function RegisterDetectionZone(entry)
             _mappinSnapped[entry.id] = nil
         end,
     })
-    _snapZones[entry.id] = zoneHandle
+    _snapZones[entry.id] = snapHandle
+
+    -- LookAt zone: only registered if the mod uses inventory-based collection check
+    if _config and _config.checkInventory then
+        local lookHandle
+        lookHandle = _engine.RegisterZone({
+            id       = setName .. "_look_" .. entry.id,
+            x        = entry.coords.x,
+            y        = entry.coords.y,
+            z        = entry.coords.z,
+            radius   = lookAtRadius,
+            throttle = 30,
+            onTick   = function()
+                local entity = ResolveEntity(entry)
+                if not entity then return end
+
+                local targeting = Game.GetTargetingSystem()
+                local player    = Game.GetPlayer()
+                if not targeting or not player then return end
+                local lookedAt = targeting:GetLookAtObject(player, false, false)
+                if not lookedAt then return end
+                if lookedAt:GetEntityID().hash ~= entity:GetEntityID().hash then return end
+
+                local result = _config.checkInventory(entry, entity)
+                if _isDebug then
+                    Utils.Log(string.format("[LookAt] %s | result=%s | clock=%.2f",
+                        entry.id, tostring(result), os.clock()), Utils.LogLevel.Debug)
+                end
+                if result == false then
+                    Utils.Log("[LookAt] Container empty. Auto-collecting: " .. entry.name,
+                        Utils.LogLevel.Debug)
+                    ChecklistCore.SetItemStatus(entry.id, true)
+                    if _config.onAutoCollect then _config.onAutoCollect(entry) end
+                elseif result == true then
+                    -- Shard confirmed present; further LookAt polling is redundant.
+                    -- OnInventoryItemAdded handles the actual loot event.
+                    local h = _lookAtZones[entry.id]
+                    if h then
+                        h:unregister()
+                        _lookAtZones[entry.id] = nil
+                        if _isDebug then
+                            Utils.Log("[LookAt] Shard confirmed present; zone retired: " ..
+                                entry.id, Utils.LogLevel.Debug)
+                        end
+                    end
+                end
+                -- result == nil: keep polling on next tick
+            end,
+        })
+        _lookAtZones[entry.id] = lookHandle
+    end
 end
 
 local function CancelSnapZone(id)
     if _snapZones[id] then
         _snapZones[id]:unregister()
         _snapZones[id] = nil
-        _mappinSnapped[id] = nil
     end
+    if _lookAtZones[id] then
+        _lookAtZones[id]:unregister()
+        _lookAtZones[id] = nil
+    end
+    _mappinSnapped[id] = nil
 end
 
 local function CancelAllSnapZones()
-    for _, handle in pairs(_snapZones) do
-        handle:unregister()
-    end
+    for _, handle in pairs(_snapZones) do handle:unregister() end
+    for _, handle in pairs(_lookAtZones) do handle:unregister() end
     _snapZones     = {}
+    _lookAtZones   = {}
     _mappinSnapped = {}
+end
+
+-- ### CONTAINER INVENTORY CHECK (shared by mods whose detection relies on container state) ###
+-- Given a container entity and a prebuilt lookup table of target TweakDBID keys, returns:
+--   true  → container holds at least one matching item
+--   false → container holds no matching items (other loot may be present)
+--   nil   → can't determine (entity/trans unavailable, binding missing, or GetItemList failed)
+
+-- Builds a key-lookup table from a list of TweakDBID strings. Keys are normalised via
+-- tostring(TweakDBID.new()) so they always match whatever form CET produces at iteration time.
+function ChecklistCore.MakeKeyLookup(tdbidStrings)
+    local keys = {}
+    for _, s in ipairs(tdbidStrings) do
+        keys[tostring(TweakDBID.new(s))] = true
+    end
+    return keys
+end
+
+-- Uses Inspector's proven pattern: fetch TransactionSystem inside, pcall the call,
+-- handle the multi-return variant (CET may place the item list in either slot).
+function ChecklistCore.ContainerContainsAny(entity, keys)
+    if not entity then return nil end
+    local trans = Game.GetTransactionSystem()
+    if not trans then return nil end
+
+    local ok, r1, r2 = pcall(function() return trans:GetItemList(entity) end)
+    if not ok then
+        if _isDebug then Utils.Log("[Inv] GetItemList error: " .. tostring(r1), Utils.LogLevel.Debug) end
+        return nil
+    end
+    local itemList = (type(r2) == "table" and r2) or (type(r1) == "table" and r1) or nil
+    if _isDebug then
+        Utils.Log(string.format("[Inv] count=%s",
+            itemList and tostring(#itemList) or "nil"), Utils.LogLevel.Debug)
+    end
+    if not itemList then return nil end
+    for _, itemData in ipairs(itemList) do
+        if itemData and itemData.GetID then
+            local tdbidStr = tostring(ItemID.GetTDBID(itemData:GetID()))
+            if _isDebug then Utils.Log("[Inv]   - " .. tdbidStr, Utils.LogLevel.Debug) end
+            if keys[tdbidStr] then return true end
+        end
+    end
+    return false
 end
 
 -- ### LOOT LOOKUP (O(1) inventory hook — only for mods with unique baseIDs per entry) ###

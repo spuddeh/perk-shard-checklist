@@ -7,11 +7,13 @@
 
 local PerkShardsDB = require("db")
 local GameSession = require("Modules/GameSession")
+local GameUI      = require("Modules/GameUI")
 local ChecklistUI = require("Modules/ChecklistUI")
 local SettingsUI = require("Modules/SettingsUI")
 local Automation = require("Modules/Automation")
 local Inspector = require("Modules/Inspector")
 local Utils = require("Modules/Utils")
+Utils.LogPrefix = IconGlyphs.BookArrowUp .. " [Perk Shard Checklist] "
 
 -- ### MOD STATE ###
 
@@ -81,7 +83,7 @@ local uiCallbacks = {
         local pos = ToVector4 { x = coords.x, y = coords.y, z = coords.z, w = 1 }
         local rot = ToEulerAngles { roll = 0, pitch = 0, yaw = coords.yaw or 0 }
         Game.GetTeleportationFacility():Teleport(player, pos, rot)
-        Utils.Log("Teleported to: " .. name)
+        Utils.Log("Teleported to: " .. name, Utils.LogLevel.Debug)
       end
     end
 
@@ -170,6 +172,7 @@ registerForEvent("onInit", function()
   local Mod = Engine.Register("perk_shard_checklist")
 
   LoadConfig()
+  Utils.SetDebugMode(settings.dev_mode_enabled)
 
   if settings.dev_mode_enabled then
     Utils.Log("DEV MODE ACTIVE - Inspector Enabled")
@@ -187,13 +190,13 @@ registerForEvent("onInit", function()
     Automation.SetInCutscene(tier > 1)
   end)
 
-  -- 0-Engine: menu pause/resume (replaces GameSession.IsPaused polling)
-  Engine.Subscribe("MenuOpen", function()
-    Automation.SetMenuPaused(true)
-  end)
-  Engine.Subscribe("MenuClose", function()
-    Automation.SetMenuPaused(false)
-  end)
+  -- GameUI: handles loading screens and menus with correct timing.
+  -- OnLoadingStart fires via LoadingScreenProgressBarController::SetProgress —
+  -- immediately when the loading screen initialises, before the bar moves.
+  GameUI.OnLoadingStart(function() Automation.SetMenuPaused(true) end)
+  GameUI.OnLoadingFinish(function() Automation.SetMenuPaused(false) end)
+  GameUI.OnMenuOpen(function() Automation.SetMenuPaused(true) end)
+  GameUI.OnMenuClose(function() Automation.SetMenuPaused(false) end)
 
   -- VENDOR LISTENER: Precise ID from UI Data
   ObserveAfter("FullscreenVendorGameController", "OnSetUserData", function(this)
@@ -283,17 +286,26 @@ registerForEvent("onInit", function()
     isSessionActive = true
 
     Automation.Init(sessionState, uiCallbacks, settings.dev_mode_enabled, settings)
-    Automation.SetMenuPaused(false)  -- begin 3s grace period (also schedules deferred Scan)
-    Automation.UpdateState()        -- register SpatialSet
-    Automation.Scan()               -- CheckQuestFacts + immediate proximity check
+    Automation.UpdateState()  -- register SpatialSet and zones (suppressed if loading)
+    -- SetMenuPaused(false) is NOT called here — GameUI.OnLoadingFinish/OnMenuClose
+    -- fires when gameplay actually resumes and handles it, ensuring zones stay
+    -- suppressed throughout the entire loading screen.
+    if not GameSession.IsPaused() then
+      Automation.Scan()  -- retroactive detection only when gameplay is active
+    end
   end, nil, 2)
 
-  -- v0.18.0+: PlayerInvalidated no longer fires on vendor opens or transient hiccups.
-  -- Safe to use for full session teardown again.
+  -- PlayerInvalidated: 0-Engine resource cleanup only.
+  -- Still fires on some vendor opens (reported to DigitalVixen) — do not gate isSessionActive here.
   Engine.Subscribe("PlayerInvalidated", function()
-    Utils.Log("Player Invalidated. Stopping mod.")
-    isSessionActive = false
+    Utils.Log("Player Invalidated. Cleaning up SpatialSet.")
     Automation.UnregisterItemSet()
+  end)
+
+  -- GameSession.OnEnd fires only on true session end (return to main menu).
+  GameSession.OnEnd(function()
+    Utils.Log("Game Session Ended.")
+    isSessionActive = false
   end)
 
   Utils.Log("Loaded (Wait for Player Ready).")
@@ -324,6 +336,7 @@ end)
 
 local function ToggleDebug()
   settings.dev_mode_enabled = not settings.dev_mode_enabled
+  Utils.SetDebugMode(settings.dev_mode_enabled)
 
   Automation.Init(sessionState, uiCallbacks, settings.dev_mode_enabled, settings)
 

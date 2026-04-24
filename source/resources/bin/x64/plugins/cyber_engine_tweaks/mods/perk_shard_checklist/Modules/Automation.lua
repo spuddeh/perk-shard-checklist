@@ -28,6 +28,7 @@ Automation.ResolveClosestUncollected = Core.ResolveClosestUncollected
 -- ### PSC-SPECIFIC: COLLECTED STATE ###
 
 local _sessionState = nil
+local _isDebug      = false
 
 local function IsCollected(id)
     return _sessionState and _sessionState.progress and _sessionState.progress[id] == true
@@ -55,14 +56,21 @@ local function BuildEntries()
 end
 
 -- ### PSC-SPECIFIC: INVENTORY CHECK ###
+-- Only the tracked shard counts — other loot in the container doesn't block auto-collect.
 
-local function HasAnyPerkShard(entity, trans)
-    if not entity or not trans then return nil end
-    local success, _ = trans:GetItemList(entity)
-    if success ~= true then return nil end
-    if trans:HasItem(entity, ItemID.new(TweakDBID.new("Items.PerkPointSkillbook")))  then return true end
-    if trans:HasItem(entity, ItemID.new(TweakDBID.new("Items.IKPerkPointSkillbook"))) then return true end
-    return false
+local _perkShardKeys = nil
+local function PerkShardKeys()
+    if not _perkShardKeys then
+        _perkShardKeys = Core.MakeKeyLookup({
+            "Items.PerkPointSkillbook",
+            "Items.IKPerkPointSkillbook",
+        })
+    end
+    return _perkShardKeys
+end
+
+local function HasAnyPerkShard(_entry, entity)
+    return Core.ContainerContainsAny(entity, PerkShardKeys())
 end
 
 -- ### PSC-SPECIFIC: QUEST FACT CHECK (retroactive detection) ###
@@ -90,8 +98,6 @@ end
 -- ### PSC-SPECIFIC: onItemEnter ###
 -- Notification only. Detection zone handles entity snap + inventory check.
 
-local _isDebug = false
-
 local function OnItemEnter(spatialEntry, _)
     local entry = spatialEntry.dbEntry
     if not Core.IsNotified(entry.id) then
@@ -116,9 +122,6 @@ local function ScanTarget(explicitTargetID, notifyOnSuccess)
     end
     if not targetHash then return end
 
-    local trans = Game.GetTransactionSystem()
-    if not trans then return end
-
     for _, cat in ipairs(PerkShardsDB) do
         for _, entry in ipairs(cat.entries) do
             local isVendor = false
@@ -133,7 +136,7 @@ local function ScanTarget(explicitTargetID, notifyOnSuccess)
             end
 
             if not IsCollected(entry.id) and (tostring(entry.container_id) == tostring(targetHash) or isVendor) then
-                local result = HasAnyPerkShard(target, trans)
+                local result = HasAnyPerkShard(entry, target)
                 if result == nil then
                     if _isDebug then
                         Utils.Log("Inventory not ready for target: " .. tostring(targetHash), Utils.LogLevel.Debug)
@@ -179,6 +182,9 @@ function Automation.Init(sessionState, _, debugMode, settings)
         snapRadius       = 20.0,
         buildEntries     = BuildEntries,
         onItemEnter      = OnItemEnter,
+        onAutoCollect    = function(entry)
+            Core.QueueOrShow("Perk Shard already looted: " .. entry.name)
+        end,
         checkInventory   = HasAnyPerkShard,
         isCollected      = IsCollected,
     }, _isDebug)
