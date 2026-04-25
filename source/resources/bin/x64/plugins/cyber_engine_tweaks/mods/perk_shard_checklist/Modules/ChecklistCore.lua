@@ -211,7 +211,10 @@ local function RegisterDetectionZone(entry)
     local lookAtRadius = (_config and _config.lookAtRadius) or 3.0
     local setName      = (_config and _config.setName) or "checklist"
 
-    -- Snap zone: mappin creation + entity-position snap
+    -- Snap zone: mappin creation + entity-position snap (default behaviour).
+    -- Mods may override via onSnapEnter/onSnapExit callbacks and opt out of the
+    -- default snap via config.noAutoSnap (e.g. RTC, where the game's own native
+    -- mappin takes over inside the snap radius so we HIDE ours there).
     local snapHandle
     snapHandle = _engine.RegisterZone({
         id       = setName .. "_snap_" .. entry.id,
@@ -220,7 +223,14 @@ local function RegisterDetectionZone(entry)
         z        = entry.coords.z,
         radius   = snapRadius,
         throttle = 30,
+        onEnter  = function()
+            if _config and _config.onSnapEnter then
+                local entity = ResolveEntity(entry)
+                _config.onSnapEnter(entry, entity)
+            end
+        end,
         onTick   = function()
+            if _config and _config.noAutoSnap then return end
             if _config and _config.canShow and not _config.canShow(entry) then return end
 
             -- Ensure mappin exists (player may have loaded inside zone during grace period)
@@ -244,6 +254,7 @@ local function RegisterDetectionZone(entry)
         onExit = function()
             -- Reset snap so mappin re-snaps on next entry (handles mappin recreation)
             _mappinSnapped[entry.id] = nil
+            if _config and _config.onSnapExit then _config.onSnapExit(entry) end
         end,
     })
     _snapZones[entry.id] = snapHandle

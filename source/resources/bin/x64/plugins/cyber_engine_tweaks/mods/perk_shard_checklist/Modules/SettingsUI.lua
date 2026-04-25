@@ -1,8 +1,9 @@
 -- ======================================================================================
--- Mod Name: Perk Shard Checklist
+-- SettingsUI.lua  (canonical: _shared/checklist/)
 -- Author: Spuddeh
--- Description: Shared Settings Module for Checklist Mods
--- Mod Version: 2.0.2
+-- Description: Shared settings panel for the Checklist mod family — automation toggle,
+--              scanner radius slider with debounce, drawCustomSettings callback.
+--              Deployed byte-identical to each mod.
 -- ======================================================================================
 
 local SettingsUI = {}
