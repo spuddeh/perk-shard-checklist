@@ -24,6 +24,8 @@ Automation.RemoveMappin             = Core.RemoveMappin
 Automation.SetVendorOpen            = Core.SetVendorOpen
 Automation.HasNearbyEntries         = Core.HasNearbyEntries
 Automation.ResolveClosestUncollected = Core.ResolveClosestUncollected
+Automation.SetUserPin               = Core.SetUserPin
+Automation.ClearUserPin             = Core.ClearUserPin
 
 -- ### PSC-SPECIFIC: COLLECTED STATE ###
 

@@ -32,7 +32,8 @@ local isOverlayOpen = false
 local isSessionActive = false
 -- Runtime State (Non-persistent)
 local runtimeState = {
-  current_mappin = nil
+  current_pin_entry_id = nil,    -- entry id of the active "Set Pin" target (entry coords, adopted by Core)
+  current_gig_pin      = nil,    -- mappin handle for gig pins (separate from entry coords; not adopted)
 }
 local config_file = "config.json"
 
@@ -87,20 +88,28 @@ local uiCallbacks = {
       end
     end
 
-    local function SetPin(coords, name)
-      if runtimeState.current_mappin then
-        Game.GetMappinSystem():UnregisterMappin(runtimeState.current_mappin)
-        runtimeState.current_mappin = nil
+    -- Clears whichever pin is currently active (entry-coords adopted, OR gig-coords standalone).
+    local function ClearAnyPin()
+      if runtimeState.current_pin_entry_id then
+        Automation.ClearUserPin(runtimeState.current_pin_entry_id)
+        runtimeState.current_pin_entry_id = nil
       end
-      if coords then
-        local mappinData = MappinData.new()
-        mappinData.mappinType = TweakDBID.new('Mappins.DefaultStaticMappin')
-        mappinData.variant = gamedataMappinVariant.CustomPositionVariant
-        mappinData.visibleThroughWalls = true
-        local pin_pos = Vector4.new(coords.x, coords.y, coords.z, 0)
-        runtimeState.current_mappin = Game.GetMappinSystem():RegisterMappin(mappinData, pin_pos)
-        Utils.Log("Map pin set for: " .. name)
+      if runtimeState.current_gig_pin then
+        Game.GetMappinSystem():UnregisterMappin(runtimeState.current_gig_pin)
+        runtimeState.current_gig_pin = nil
       end
+    end
+
+    -- Standalone pin for gig-start coords (not tied to a checklist entry's snap zone).
+    local function SetGigPin(coords, name)
+      if not coords then return end
+      local mappinData = MappinData.new()
+      mappinData.mappinType = TweakDBID.new('Mappins.DefaultStaticMappin')
+      mappinData.variant = gamedataMappinVariant.CustomPositionVariant
+      mappinData.visibleThroughWalls = true
+      local pin_pos = Vector4.new(coords.x, coords.y, coords.z, 1.0)
+      runtimeState.current_gig_pin = Game.GetMappinSystem():RegisterMappin(mappinData, pin_pos)
+      Utils.Log("Map pin set for: " .. name)
     end
 
     if action == "teleport" then
@@ -108,9 +117,15 @@ local uiCallbacks = {
     elseif action == "gig_teleport" then
       TeleportTo(entry.gig_coords, entry.name .. " (Gig Start)")
     elseif action == "mappin" then
-      SetPin(entry.coords, entry.name)
+      ClearAnyPin()
+      if entry.coords then
+        Automation.SetUserPin(entry)
+        runtimeState.current_pin_entry_id = entry.id
+        Utils.Log("Map pin set for: " .. entry.name)
+      end
     elseif action == "gig_mappin" then
-      SetPin(entry.gig_coords, entry.name .. " (Gig Start)")
+      ClearAnyPin()
+      SetGigPin(entry.gig_coords, entry.name .. " (Gig Start)")
     end
   end,
 
@@ -119,6 +134,21 @@ local uiCallbacks = {
       onSettingChanged = function()
         Automation.UpdateState()
         SaveConfig()
+      end,
+
+      onClearAllPins = function()
+        local cleared = false
+        if runtimeState.current_pin_entry_id then
+          Automation.ClearUserPin(runtimeState.current_pin_entry_id)
+          runtimeState.current_pin_entry_id = nil
+          cleared = true
+        end
+        if runtimeState.current_gig_pin then
+          Game.GetMappinSystem():UnregisterMappin(runtimeState.current_gig_pin)
+          runtimeState.current_gig_pin = nil
+          cleared = true
+        end
+        Utils.Log(cleared and "Last map pin cleared." or "No map pin to clear.")
       end,
 
       drawCustomSettings = function()
