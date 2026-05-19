@@ -2,7 +2,7 @@
 -- Mod Name: Perk Shard Checklist
 -- Author: Spuddeh
 -- Description: Main entry point and initialization logic.
--- Mod Version: 2.1.0
+-- Mod Version: 3.0.0
 -- ======================================================================================
 
 local PerkShardsDB = require("db")

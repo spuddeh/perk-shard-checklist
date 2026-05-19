@@ -1,4 +1,9 @@
-# Perk Shard Checklist — Nexus Changelogs
+# Perk Shard Checklist - Nexus Changelogs
+
+### 3.0.0
+- New required dependency: 0-Engine (Nexus mod 27967, pure CET-only build). See the requirements section in the description. The mod will not run without it.
+- The proximity scanner was rebuilt on 0-Engine. It reacts to you crossing into range instead of polling on a timer, so there is no CPU cost when you are away from any shard, and detection is tighter up close.
+- Removed the scanner interval setting. The new system has no polling interval so it no longer applies.
 
 ### 2.0.2
 - ACTUALLY fixed scanner loop not stopping correctly when everything is collected.
@@ -28,9 +33,14 @@ No issues flagged.
 ```
 [color=#ffff00][size=5][b]- Changes -[/b][/size][/color]
 
-[b][size=3]Version 2.0.2[/size][/b]
-[list][*]ACTUALLY fixed scanner loop not stopping correctly when everything is collected.
+[b][size=3]Version 3.0.0[/size][/b]
+[list][*]New required dependency: 0-Engine (Nexus mod 27967, pure CET-only build). The mod will not run without it. See the requirements section in the description.
+[*]The proximity scanner was rebuilt on 0-Engine. No CPU cost when you are away from any shard, and tighter detection up close.
+[*]Removed the scanner interval setting (the new system has no polling interval).
 [/list]
+[b][size=3]Version 2.0.2[/size][/b]
+[spoiler][list][*]ACTUALLY fixed scanner loop not stopping correctly when everything is collected.
+[/list][/spoiler]
 [b][size=3]Version 2.0.1[/size][/b]
 [spoiler][list][*]Fixed scanner loop not stopping correctly when everything is collected.
 [*]Added 7s safety delay on teleport to prevent false "auto-collects" during loading screens.
@@ -47,4 +57,4 @@ No issues flagged.
 [/list][/spoiler]
 ```
 
-> Character count: 1165 / 5000
+> Character count: ~1500 / 5000

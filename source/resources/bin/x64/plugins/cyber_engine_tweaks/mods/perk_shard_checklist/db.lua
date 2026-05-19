@@ -2,7 +2,7 @@
 -- Mod Name: Perk Shard Checklist
 -- Author: Spuddeh
 -- Description: Static Database of Perk Shards (Coords, Facts, IDs)
--- Mod Version: 2.0.2
+-- Mod Version: 3.0.0
 -- ======================================================================================
 
 local PerkShardsDB = {

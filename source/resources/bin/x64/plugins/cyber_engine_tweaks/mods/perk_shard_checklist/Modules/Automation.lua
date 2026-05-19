@@ -2,7 +2,7 @@
 -- Mod Name: Perk Shard Checklist
 -- Author: Spuddeh
 -- Description: PSC-specific automation logic. Delegates shared behaviour to ChecklistCore.
--- Mod Version: 2.1.0
+-- Mod Version: 3.0.0
 -- ======================================================================================
 
 local Automation  = {}

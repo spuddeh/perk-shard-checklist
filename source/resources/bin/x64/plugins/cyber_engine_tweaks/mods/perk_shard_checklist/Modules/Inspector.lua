@@ -2,7 +2,7 @@
 -- Mod Name: Perk Shard Checklist
 -- Author: Spuddeh
 -- Description: "All-in-One" Research Tool. Dumps Coords, Facts, Items.
--- Mod Version: 2.0.2
+-- Mod Version: 3.0.0
 -- =============================================================================================================
 
 local Inspector = {}

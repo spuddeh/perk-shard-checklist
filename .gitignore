@@ -4,6 +4,7 @@ layout.xml
 .projectFiles/
 packed/
 custom_refs.txt
+GraphEditorStates/
 
 # Editor
 .vscode/
@@ -14,3 +15,4 @@ custom_tweaks.txt
 *.zip
 *.xcf
 images/
+CLAUDE.md
