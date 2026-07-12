@@ -54,7 +54,7 @@ local function GetLocationData()
             local currentRecord = nil
 
             if districtObj and districtObj.GetDistrictID then
-                -- Lint fix logic: wrap in pcall if type mismatch suspected
+                -- pcall: GetDistrictRecord throws if the district ID is not a valid record.
                 pcall(function()
                     currentRecord = TweakDBInterface.GetDistrictRecord(districtObj:GetDistrictID())
                 end)

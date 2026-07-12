@@ -285,7 +285,7 @@ registerForEvent("onInit", function()
     end
   end)
 
-  -- GameSession: per-character save persistence (unchanged)
+  -- GameSession: per-character save persistence.
   GameSession.StoreInDir('sessions')
   GameSession.Persist(sessionState)
 
